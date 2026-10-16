@@ -55,7 +55,7 @@ it('streams only the notifications the client asked for, stamped with the subscr
         'resourceSubscriptions' => ['file://a'],
     ]);
 
-    expect(array_column($messages, 'method'))->toBe([
+    expect(array_map(fn (array $m) => $m['method'] ?? null, $messages))->toBe([
         'notifications/subscriptions/acknowledged',
         'notifications/tools/list_changed',
         'notifications/resources/updated',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Laravel\Mcp\Server;
 
+use Closure;
 use Illuminate\Container\Container;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -19,6 +20,7 @@ class ServerContext
      * @param  array<int|string, Tool|string|array<int, Tool|string>>  $tools
      * @param  array<int, Resource|string>  $resources
      * @param  array<int, Prompt|string>  $prompts
+     * @param  (Closure(Subscription): iterable<mixed>)|null  $subscriptions
      */
     public function __construct(
         public array $supportedProtocolVersions,
@@ -30,6 +32,7 @@ class ServerContext
         protected array $tools,
         protected array $resources,
         protected array $prompts,
+        public ?Closure $subscriptions = null,
     ) {
         //
     }

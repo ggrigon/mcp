@@ -38,6 +38,7 @@ use Laravel\Mcp\Server\Methods\ReadResource;
 use Laravel\Mcp\Server\Prompt;
 use Laravel\Mcp\Server\Resource;
 use Laravel\Mcp\Server\ServerContext;
+use Laravel\Mcp\Server\Subscription;
 use Laravel\Mcp\Server\Testing\PendingTestResponse;
 use Laravel\Mcp\Server\Testing\TestListResponse;
 use Laravel\Mcp\Server\Testing\TestResponse;
@@ -45,6 +46,7 @@ use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Transport\JsonRpcNotification;
 use Laravel\Mcp\Transport\JsonRpcRequest;
 use Laravel\Mcp\Transport\JsonRpcResponse;
+use ReflectionMethod;
 use stdClass;
 use Throwable;
 
@@ -272,6 +274,7 @@ abstract class Server
             tools: $this->tools,
             resources: $this->resources,
             prompts: $this->prompts,
+            subscriptions: $this->hasSubscriptions() ? $this->subscriptions(...) : null,
         );
     }
 
@@ -433,9 +436,45 @@ abstract class Server
             fn (Extension $extension): array => [$extension->value => (object) []],
         );
 
+        $capabilities = $this->hasSubscriptions()
+            ? $this->withListChanged($this->capabilities)
+            : $this->capabilities;
+
         return $extensions === []
-            ? $this->capabilities
-            : [...$this->capabilities, 'extensions' => $extensions];
+            ? $capabilities
+            : [...$capabilities, 'extensions' => $extensions];
+    }
+
+    /**
+     * Override to keep a `subscriptions/listen` stream open and yield list-changed
+     * or resource-updated notifications. Servers that do not override this keep the
+     * default: an empty acknowledgment followed by an immediate graceful close.
+     *
+     * @return iterable<JsonRpcResponse>
+     */
+    protected function subscriptions(Subscription $subscription): iterable
+    {
+        return [];
+    }
+
+    protected function hasSubscriptions(): bool
+    {
+        return (new ReflectionMethod($this, 'subscriptions'))->getDeclaringClass()->getName() !== self::class;
+    }
+
+    /**
+     * @param  array<string, array<string, bool>|stdClass|string>  $capabilities
+     * @return array<string, array<string, bool>|stdClass|string>
+     */
+    protected function withListChanged(array $capabilities): array
+    {
+        foreach ([self::CAPABILITY_TOOLS, self::CAPABILITY_RESOURCES, self::CAPABILITY_PROMPTS] as $key) {
+            if (is_array($capabilities[$key] ?? null)) {
+                $capabilities[$key]['listChanged'] = true;
+            }
+        }
+
+        return $capabilities;
     }
 
     protected function detectUiCapability(): void
